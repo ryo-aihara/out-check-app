@@ -1,25 +1,219 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>外出前チェックリスト</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>外出前チェック</title>
 
+  <!-- ここに見た目（CSS）を全部まとめる -->
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "Helvetica Neue", sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #ffffff;
+    }
+
+    .container {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin: 8px 0 24px;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      font-size: 17px;
+      margin-bottom: 14px;
+    }
+
+    .item input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      margin-right: 10px;
+    }
+
+    #memo {
+      width: 100%;
+      min-height: 120px;
+      font-size: 16px;
+      padding: 10px;
+      box-sizing: border-box;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      resize: vertical;
+      margin-top: 12px;
+    }
+
+    #saveBtn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 14px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background: #0a84ff;
+      color: #fff;
+    }
+
+    #lastSaved {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #666;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
     <h1>外出前チェックリスト</h1>
 
-    <div id="checklist">
-        <label><input type="checkbox" id="iron"> アイロンのコンセント</label><br>
-        <label><input type="checkbox" id="gas"> ガスの元栓</label><br>
-        <label><input type="checkbox" id="cons3"> コンセント3</label><br>
+    <div class="item">
+      <input type="checkbox" id="iron" />
+      <label for="iron">アイロンのコンセント</label>
     </div>
 
-    <textarea id="memo" placeholder="メモ欄"></textarea>
+    <div class="item">
+      <input type="checkbox" id="gas" />
+      <label for="gas">ガスの元栓</label>
+    </div>
 
-    <button id="saveBtn">保存</button>
+    <div class="item">
+      <input type="checkbox" id="cons3" />
+      <label for="cons3">コンセント3箇所（冷蔵庫・トースター・ベッド）</label>
+    </div>
 
-    <script src="script.js"></script>
+    <div class="item">
+      <input type="checkbox" id="light" />
+      <label for="light">部屋の電気</label>
+    </div>
+
+    <div class="item">
+      <input type="checkbox" id="balcony" />
+      <label for="balcony">ベランダの窓</label>
+    </div>
+
+    <div class="item">
+      <input type="checkbox" id="tv" />
+      <label for="tv">テレビの電源</label>
+    </div>
+
+    <div class="item">
+      <input type="checkbox" id="aircon" />
+      <label for="aircon">エアコン</label>
+    </div>
+
+    <textarea id="memo" placeholder="メモ欄（自由記述）"></textarea>
+
+    <button id="saveBtn">保存（完了）</button>
+    <div id="lastSaved"></div>
+  </div>
+
+  <!-- 挙動（JavaScript）もこの中に全部まとめる -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const items = [
+        { id: "iron",    label: "アイロンのコンセント" },
+        { id: "gas",     label: "ガスの元栓" },
+        { id: "cons3",   label: "コンセント3箇所（冷蔵庫・トースター・ベッド）" },
+        { id: "light",   label: "部屋の電気" },
+        { id: "balcony", label: "ベランダの窓" },
+        { id: "tv",      label: "テレビの電源" },
+        { id: "aircon",  label: "エアコン" },
+      ];
+
+      const memo = document.getElementById("memo");
+      const saveBtn = document.getElementById("saveBtn");
+      const lastSaved = document.getElementById("lastSaved");
+      const STORAGE_KEY = "out-check-v1";
+
+      // 各チェックボックスに「本当に確認した？」の確認をつける
+      items.forEach(item => {
+        const checkbox = document.getElementById(item.id);
+        checkbox.addEventListener("change", () => {
+          // チェックを入れたときだけ確認（外したときは何もしない）
+          if (checkbox.checked) {
+            const ok = window.confirm(
+              item.label + " を本当に確認しましたか？"
+            );
+            if (!ok) {
+              // 「いいえ」の場合はチェックを元に戻す
+              checkbox.checked = false;
+            }
+          }
+        });
+      });
+
+      // 前回保存した状態を読み込み（任意だけど便利だから入れておく）
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const data = JSON.parse(saved);
+          items.forEach(item => {
+            const checkbox = document.getElementById(item.id);
+            checkbox.checked = !!data[item.id];
+          });
+          memo.value = data.memo || "";
+          if (data.savedAt) {
+            lastSaved.textContent = "前回の完了: " + data.savedAt;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      // 保存（完了）ボタン
+      saveBtn.addEventListener("click", () => {
+        // 未チェックの項目がないか確認
+        const unchecked = items.filter(item => {
+          const checkbox = document.getElementById(item.id);
+          return !checkbox.checked;
+        });
+
+        if (unchecked.length > 0) {
+          const names = unchecked.map(u => "・" + u.label).join("\n");
+          alert(
+            "まだ確認できていない項目があります。\n\n" +
+            names +
+            "\n\nすべて確認してから完了してください。"
+          );
+          return; // ここで完了させない
+        }
+
+        // すべてチェック済み → 保存（完了）
+        const now = new Date();
+        const timestamp =
+          now.getFullYear() +
+          "/" +
+          (now.getMonth() + 1) +
+          "/" +
+          now.getDate() +
+          " " +
+          now.getHours().toString().padStart(2, "0") +
+          ":" +
+          now.getMinutes().toString().padStart(2, "0");
+
+        const dataToSave = { memo: memo.value, savedAt: timestamp };
+        items.forEach(item => {
+          const checkbox = document.getElementById(item.id);
+          dataToSave[item.id] = checkbox.checked;
+        });
+
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+          alert("すべて確認済みとして保存（完了）しました。");
+          lastSaved.textContent = "最終完了: " + timestamp;
+        } catch (e) {
+          console.error(e);
+          alert("保存に失敗しました…");
+        }
+      });
+    });
+  </script>
 </body>
 </html>
